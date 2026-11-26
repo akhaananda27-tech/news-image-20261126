@@ -7,6 +7,8 @@ identical bytes. Output goes to $MAKEFUN_OUTPUT_DIR/entry.png.
 
 import os
 
+from pathlib import Path
+
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1024, 1024
@@ -14,15 +16,41 @@ PAPER = (247, 245, 239)
 INK = (12, 12, 12)
 GREY = (90, 90, 88)
 
-FONT_DIR = "/usr/share/fonts/truetype/dejavu"
-SERIF = os.path.join(FONT_DIR, "DejaVuSerif.ttf")
-SERIF_B = os.path.join(FONT_DIR, "DejaVuSerif-Bold.ttf")
-SERIF_I = "/usr/share/fonts/truetype/liberation/LiberationSerif-Italic.ttf"
-SANS = "/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf"
+# Fonts are bundled in the repo under fonts/ (DejaVu: free license;
+# Liberation: SIL OFL) so the program does not depend on system fonts.
+# System paths are kept only as a fallback for local runs.
+_REPO_FONTS = Path(__file__).parent / "fonts"
+_SYSTEM_FONTS = [
+    "/usr/share/fonts/truetype/dejavu",
+    "/usr/share/fonts/truetype/liberation",
+]
+
+
+def _font_path(name):
+    repo = _REPO_FONTS / name
+    if repo.is_file():
+        return str(repo)
+    for d in _SYSTEM_FONTS:
+        cand = os.path.join(d, name)
+        if os.path.isfile(cand):
+            return cand
+    return str(repo)
+
+
+SERIF = _font_path("DejaVuSerif.ttf")
+SERIF_B = _font_path("DejaVuSerif-Bold.ttf")
+SERIF_I = _font_path("LiberationSerif-Italic.ttf")
+SANS = _font_path("LiberationSerif-Regular.ttf")
 
 
 def font(path, size):
-    return ImageFont.truetype(path, size)
+    try:
+        return ImageFont.truetype(path, size)
+    except (OSError, IOError):
+        try:
+            return ImageFont.load_default(size=size)
+        except TypeError:  # Pillow < 10.1 has no size kwarg
+            return ImageFont.load_default()
 
 
 def wrap(draw, text, fnt, width):
